@@ -538,9 +538,10 @@ python3 LynkCoHelper/tools/extract_appsecret_auto.py
 免交互确认，直接写入 env.json。Linux（TCG 全系统模拟）下所有等待窗口
 自动放宽 10 倍，无需手工干预。
 
-CI 工作流另支持可选 Secret `LYNKCO_PAT`（具备本仓库 Secret 写权限的 PAT）：
-配置后提取结果会自动合并更新 `LYNKCO_APP_SECRETS` Secret，未配置时从
-运行日志取值手动更新。
+CI 工作流的提取结果通过一次性链接送达（api.cloudcpp.com 托管，国内直连
+友好，仅可打开 1 次、10 分钟失效，链接打印在运行日志中；GitHub 内置
+GITHUB_TOKEN 无权写仓库 Secrets，故不做自动同步），拿到值后手动更新
+`LYNKCO_APP_SECRETS` 供 daily-tasks 使用。
 
 预计耗时：首次（含下载依赖）约 5~10 分钟，之后每次约 1~2 分钟。脚本自动
 完成 4.5 节的全流程：代理抢握手 → suspend 冻结 → 断点 → 单步探测 →
