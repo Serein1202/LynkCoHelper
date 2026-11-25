@@ -17,32 +17,35 @@
 | `lynkco_notify.py` | Bark、飞书、钉钉、企业微信推送工具 |
 | `lynkco_daily_tasks.py` | 顶层入口：编排签到 + 分享 + 积分查询并推送结果 |
 
-此处只介绍如何使用；逆向分析等技术笔记未随仓库分发。
-
 ## AppSecret 自动提取
 
-从模拟器内运行的领克 App 中自动提取 API 密钥（`nativeAppKey` / `nativeAppSecret`），写入 `env.json` 的 `secrets` 段。原理：x86_64 系统镜像（自带 libndk，可翻译执行 arm64 原生库）+ KVM 加速冷启动 + jdb 在加固壳常量类 `<clinit>` 设断点读取字段。
+提取 API 密钥（`nativeAppKey` / `nativeAppSecret`），写入 `env.json` 的 `secrets` 段。统一入口支持直接从已验证的 4.3.0 / 4.3.1 APK 离线提取 KeyVault 固定槽位，无需 Android 环境；不含 KeyVault 的 4.2.9 保留模拟器 + jdb 流程。未知 KeyVault 库会明确报错，避免错误套用偏移。
 
-### 按平台入口（`tools/`）
+### 提取入口（`tools/`）
 
 | 脚本 | 平台 | 说明 |
 | --- | --- | --- |
-| `tools/extract_appsecret_mac.py` | macOS（HVF） | 原版交互式流程 |
-| `tools/extract_appsecret_ubuntu.py` | WSL2 Ubuntu（KVM） | 一键式，环境缺失自动下载 |
-| `tools/extract_appsecret_windows.py` | Windows 原生编排 | 模拟器跑在 WSL2，Windows 侧驱动 |
-| `tools/extract_appsecret_github_action.py` | GitHub Actions | 全自动无人值守 |
+| `tools/extract_appsecret_github_action.py` | Python / GitHub Actions | 唯一入口：4.3.x 离线提取；4.2.9 才准备 Android 环境 |
+
+本地 4.3.x 示例（在仓库根目录执行）：
+
+```bash
+python3 LynkCoHelper/tools/extract_appsecret_github_action.py --apk /path/to/lynkco.apk
+```
+
+也支持 `--apk-version 4.3.1` 从上游 Release 下载。成功后确认写入配置；设置 `LYNKCO_AUTO_WRITE=1` 可免确认。
 
 ### CI workflows（`.github/workflows/`）
 
 | Workflow | 触发 | 作用 |
 | --- | --- | --- |
-| `extract-appsecret` | 手动 | 全自动提取密钥 → 运行日志输出**一次性取件链接**（仅可打开 1 次、10 分钟失效），需手动填入 `LYNKCO_APP_SECRETS` 供 daily-tasks 使用 |
-| `fetch-lynkco-apk` | 每日 + 手动 | 拉取最新版领克 APK 上传 Release（`apk-v VERSION` 留历史 + `apk-latest` 稳定资产），提取 CI 优先使用 |
+| `extract-appsecret` | 手动 | `apk_version` 默认 `4.3.1`，可填 `X.Y.Z` 或 `latest`；提取后输出**一次性取件链接**（仅可打开 1 次、10 分钟失效），需手动填入 `LYNKCO_APP_SECRETS` 供 daily-tasks 使用 |
+| `fetch-lynkco-apk` | 每日 + 手动 | 拉取最新版领克 APK 上传 Release（`apk-vX.Y.Z` 留历史 + `apk-latest` 稳定资产） |
 
 ### 安全说明
 
-- 所有日志输出均脱敏（密钥值仅显示前 3 后 2 位），明文只写入本地 `env.json`（gitignore）；CI 提取时通过一次性链接送达明文（仅可打开 1 次，10 分钟失效）
-- CI 使用的 x86_64 模拟器镜像与 APK 均托管在仓库 Release（`sysimg-x86_64-33-r09` / `apk-latest`），版本经实测钉死，不随上游变动漂移
+- 新增静态路径隐藏完整凭据；旧版调试流程在 CI 中脱敏，本地可能显示明文。生成的 `env.json` 已被 gitignore；CI 沿用一次性链接送达明文的既有行为。
+- Action 的 `apk_version` 默认 `4.3.1`；指定 `X.Y.Z` 使用对应版本 Release，`latest` 读取 `apk-latest/lynkco-latest.apk`（当前为 4.3.1，后续随 Release 更新）。离线静态路径不依赖模拟器；只有 4.2.9 兼容流程使用固定的 x86_64 模拟器镜像。
 
 ## 快速开始
 
